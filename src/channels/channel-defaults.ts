@@ -114,6 +114,19 @@ export interface EngageValues {
   threads?: unknown;
 }
 
+/** Return an actionable error when a value cannot be compiled by the same
+ * JavaScript RegExp engine the router uses. */
+export function validateEngagePattern(pattern: unknown): string | null {
+  if (typeof pattern !== 'string') return '--engage-pattern must be a string';
+  try {
+    new RegExp(pattern);
+    return null;
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return '--engage-pattern must be a valid JavaScript regular expression';
+  }
+}
+
 /**
  * Cross-column validation against the channel's declaration. Shared by every
  * wiring-creation surface (`ncl wirings` create/update, the setup wizard's
@@ -134,6 +147,10 @@ export function validateEngageAgainstChannel(w: EngageValues, mg: MessagingGroup
     (w.engage_pattern === undefined || w.engage_pattern === null || w.engage_pattern === '')
   ) {
     throw new Error(`engage_mode 'pattern' requires --engage-pattern (use "." to match every message)`);
+  }
+  if (w.engage_pattern !== undefined && w.engage_pattern !== null) {
+    const error = validateEngagePattern(w.engage_pattern);
+    if (error) throw new Error(error);
   }
   if (w.engage_mode !== 'mention' && w.engage_mode !== 'mention-sticky') return;
 

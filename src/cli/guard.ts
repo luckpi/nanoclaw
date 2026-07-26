@@ -15,6 +15,7 @@
  * Arg auto-fill, the sessions-get existence oracle, and post-handler row
  * filtering stay in dispatch.ts — mechanics, not policy.
  */
+import { validateEngagePattern } from '../channels/channel-defaults.js';
 import { getContainerConfig } from '../db/container-configs.js';
 import { getMessagingGroupAgent } from '../db/messaging-groups.js';
 import { ALLOW, DENY, HOLD, type GuardedActionSpec, type GuardInput } from '../guard/index.js';
@@ -127,6 +128,16 @@ function commandDecide(cmd: CommandDef, input: GuardInput) {
     // Block cli_scope changes from group-scoped agents (privilege escalation)
     if (args.cli_scope !== undefined || args['cli-scope'] !== undefined) {
       return DENY('Cannot change cli_scope from a group-scoped agent.');
+    }
+  }
+
+  // Reject malformed patterns before an agent request creates an approval.
+  // The shared write-side validator remains the invariant for every caller.
+  if (cmd.name === 'wirings-create' || cmd.name === 'wirings-update') {
+    for (const key of ['engage_pattern', 'engage-pattern']) {
+      if (args[key] === undefined) continue;
+      const error = validateEngagePattern(args[key]);
+      if (error) return DENY(error);
     }
   }
 

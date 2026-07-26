@@ -539,6 +539,26 @@ describe('CLI scope enforcement', () => {
     expect(approvalState.wiringUpdates).toHaveLength(0);
   });
 
+  it.each(['engage_pattern', 'engage-pattern'])(
+    'group: wirings update rejects an invalid %s before requesting approval',
+    async (field) => {
+      mockGetContainerConfig.mockReturnValue({ cli_scope: 'group' });
+
+      const resp = await dispatch(
+        { id: '1', command: 'wirings-update', args: { id: 'w-owned', [field]: '[' } },
+        agentCtx(),
+      );
+
+      expect(resp.ok).toBe(false);
+      if (!resp.ok) {
+        expect(resp.error.code).toBe('forbidden');
+        expect(resp.error.message).toContain('valid JavaScript regular expression');
+      }
+      expect(approvalState.requestApproval).not.toHaveBeenCalled();
+      expect(approvalState.wiringUpdates).toHaveLength(0);
+    },
+  );
+
   it.each([
     ['sender_scope', 'known'],
     ['session_mode', 'agent-shared'],

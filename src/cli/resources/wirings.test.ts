@@ -121,6 +121,17 @@ describe('wirings-create — validation', () => {
     ).rejects.toThrow(/--engage-pattern/);
   });
 
+  it('rejects an engage pattern that is not a valid JavaScript regular expression', async () => {
+    await expect(
+      create({
+        messaging_group_id: 'mg-stale',
+        agent_group_id: 'ag-1',
+        engage_mode: 'pattern',
+        engage_pattern: '[',
+      }),
+    ).rejects.toThrow(/valid JavaScript regular expression/);
+  });
+
   it("rejects mention modes on a channel declaring mentions: 'never'", async () => {
     await expect(
       create({ messaging_group_id: 'mg-never', agent_group_id: 'ag-1', engage_mode: 'mention' }),
@@ -190,6 +201,18 @@ describe('wirings-update — same validation as create', () => {
       engage_pattern: '.',
     });
     await expect(update({ id: row.id, engage_mode: 'mention' })).rejects.toThrow(/mentions: 'never'/);
+  });
+
+  it('rejects an invalid engage pattern without replacing the existing rule', async () => {
+    const row = await create({
+      messaging_group_id: 'mg-never',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+    });
+
+    await expect(update({ id: row.id, engage_pattern: '[' })).rejects.toThrow(/valid JavaScript regular expression/);
+    expect(getMessagingGroupAgent(row.id as string)!.engage_pattern).toBe('.');
   });
 
   it('coerces an existing sticky wiring to mention when --threads is turned off', async () => {
