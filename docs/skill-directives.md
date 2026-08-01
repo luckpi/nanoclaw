@@ -15,6 +15,8 @@ Two invariants follow, and both are non-negotiable:
 - **Prose-primary.** With the `nc:` fences stripped, the SKILL.md must read as a normal skill — a coding agent following only the prose performs the same install. The prose never mentions the apply engine, the setup wizard, or programmatic application; a skill narrating its own tooling breaks the very degradation path the format exists for.
 - **Degrade-to-agent.** Anything the engine can't do (a step it doesn't understand, a failed command, a missing streaming exec for an interactive step) bounces to an agent task — never a crash, never a silent drop. The agent reads the surrounding prose and applies the step the way skills have always worked.
 
+Directives describe how one skill-owned outcome composes into a checkout; they do not declare runtime capabilities. Keep implementation in copied/added skill-owned files and normally use zero reach-ins or one explicit `append` to an existing barrel/registry. Do not introduce `registerCapability()`, capability metadata/discovery, auto-discovery, a process, a worker, or JSON-RPC to avoid expressing the real typed integration point.
+
 ## Fence syntax
 
 ````

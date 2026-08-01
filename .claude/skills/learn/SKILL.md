@@ -40,10 +40,14 @@ If it is ambiguous what the skill should *do*, ask one clarifying question befor
 ### 3. Distill — find the reusable procedure
 Strip the one-off specifics; keep the *repeatable* shape. A good skill answers: *"Next time someone needs to do X, what are the exact steps, files, commands, and gotchas?"* Capture:
 
+- the one operator-selectable outcome and the single cohesive reason it would change,
 - the trigger / when-to-use,
 - the step-by-step procedure (commands, file paths, decision points),
+- the skill-owned files, every reach-in to an existing file, and prerequisite skills,
 - the non-obvious **gotchas** that were hit — usually the most valuable part,
 - any scripts or templates worth shipping alongside.
+
+Split independently selectable, removable, or versioned outcomes. Keep a cohesive outcome together even when it has several internal parts.
 
 ### 4. Author the SKILL.md
 
@@ -71,6 +75,7 @@ description: "<what it does + when to use it + likely trigger phrases>"
 **House authoring rules (from `docs/skill-guidelines.md`):**
 
 - **Additive, minimal reach-ins** — prefer adding files; make the *smallest possible* edit to existing code, and only via single-line calls into skill-owned functions.
+- **Use the owning typed seam** — prefer an existing registry or hook and aim for zero existing-file edits or one explicit registration import. Do not invent `registerCapability()`, capability metadata/discovery, automatic module discovery, a child process, worker thread, IPC, or JSON-RPC as a shortcut.
 - **Instruction-only when possible** — if Claude can do it by following prose plus existing tools, ship no code. These are the easiest skills to maintain and to merge.
 - If apply leaves anything behind, ship a **`REMOVE.md`** that fully reverses every change (no soft-disabled/commented-out removals).
 - If the skill adds an integration point in core code, add a **test that goes red if the wiring is deleted or drifts**.
@@ -92,6 +97,6 @@ description: "<what it does + when to use it + likely trigger phrases>"
 
 ## Notes
 
-- Keep skills **focused** — one capability per skill (mirrors the project's "one change per PR" rule).
+- Keep skills **focused** — one operator-selectable outcome and one cohesive reason to change per skill.
 - The most valuable content is the **gotchas**, not the happy path.
 - This skill is prose and safe to re-run — use it again to refine an existing skill.

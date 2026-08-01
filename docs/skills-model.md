@@ -51,6 +51,8 @@ One honest exception: a bug fix that genuinely changes an existing line can't al
 
 ## What makes a good skill
 
+A good skill owns one operator-selectable outcome. It has one cohesive reason to change and keeps its implementation, tests, migrations, configuration adapter, and external-edge fakes in files the skill owns. Split independently selectable or removable outcomes; do not split cohesive behavior merely to improve an edit count.
+
 A good skill mostly just *adds* things:
 
 - Adds new files.
@@ -63,6 +65,10 @@ These never really break.
 The one risky move is when a skill has to *reach into* existing code and wire something in at a specific spot. That's the only part that breaks when we change the code later. Keep these rare, and keep them to a line or two that just *calls* code living in the skill's own files, not big chunks of logic inline.
 
 Rule of thumb: aim for skills that are almost all "adds." Not 100%; some reach-ins are fine. But a skill full of reach-ins is a smell, and a sign that spot in the core should become a proper hook.
+
+Capabilities are the checked-in skills themselves: each top-level `SKILL.md` name and description declares one selectable outcome. Do not add a second runtime capability list, `registerCapability()`, capability metadata/discovery, or automatic module discovery. Use the typed registry that owns the integration point and one explicit, reviewable import where registration is needed.
+
+Trusted Node.js/TypeScript skills run in the host process by default. A child process, worker thread, IPC, or JSON-RPC adds a separate lifecycle and monitoring contract, so use one only when a concrete isolation, restart, resource-limit, trust-boundary, or interoperability requirement justifies it—not to establish code ownership.
 
 ## Where a skill's files live
 

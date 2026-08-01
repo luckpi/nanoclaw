@@ -16,9 +16,10 @@ This skill helps users add capabilities or modify behavior. Use AskUserQuestion 
    - Container directory access: `/manage-mounts`.
    - Agent providers (non-default): `/add-opencode`, `/add-codex`, `/add-ollama-provider`.
    - Integrations as MCP tools: `/add-gmail-tool`, `/add-gcal-tool`, `/add-ollama-tool`, etc.
-3. **Plan the changes** — Identify the v2 surface the change belongs to (entity model in the central DB, per-agent-group container config, per-group `CLAUDE.md`, or core code).
-4. **Implement** — Make the change on the right surface.
-5. **Test guidance** — Tell the user how to verify.
+3. **Define the responsibility** — State the one operator-selectable outcome and the cohesive reason it would change. Split independently selectable, removable, or versioned outcomes.
+4. **Plan the integration** — Identify the v2 surface the change belongs to (entity model in the central DB, per-agent-group container config, per-group `CLAUDE.md`, or core code). List skill-owned files, prerequisite skills, and every existing-file integration point.
+5. **Implement** — Prefer instruction/configuration, then copied or added skill-owned files, then an existing typed registry or hook. Aim for zero existing-file edits or one explicit registration import. Do not invent `registerCapability()`, capability metadata/discovery, automatic module discovery, a child process, worker thread, IPC, or JSON-RPC as a shortcut.
+6. **Test guidance** — Guard every functional integration point with a test that fails when the real wiring is removed or drifts.
 
 ## Entity Model
 

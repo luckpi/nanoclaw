@@ -2,6 +2,12 @@
 
 Status: IMPLEMENTED on `feat/structured-skill-format` (clean break, no compat shims) — kept as the boundary-rule rationale and the consumer-contract reference. Author-facing directive grammar: [skill-directives.md](skill-directives.md).
 
+## Scope boundary
+
+This seam applies a skill document; it is not a runtime plugin protocol or capability registry. A skill owns one operator-selectable outcome, keeps its implementation in skill-owned files, and integrates through the smallest existing typed registry or hook—normally zero existing-file edits or one explicit registration import.
+
+Do not extend this engine with `registerCapability()`, capability metadata/discovery, filesystem auto-discovery, process supervision, worker threads, IPC, or JSON-RPC merely to establish ownership. Trusted Node.js/TypeScript code remains in-process by default. A separate runtime boundary requires a concrete isolation or interoperability need and its own design.
+
 ## 1. The boundary rule
 
 > **The engine may DECLARE needs and EMIT events; it may never ACQUIRE input or PRESENT anything.**

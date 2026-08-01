@@ -164,6 +164,18 @@ describe('skill discovery', () => {
   });
 });
 
+describe('skill authoring policy', () => {
+  it('keeps responsibility and minimal-integration guidance in both authoring skills', () => {
+    for (const name of ['learn', 'customize']) {
+      const md = readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
+      expect(md, `${name} must ask for one operator-selectable outcome`).toMatch(/one operator-selectable outcome/i);
+      expect(md, `${name} must inventory skill-owned files`).toMatch(/skill-owned files/i);
+      expect(md, `${name} must prohibit a generic capability registry`).toContain('registerCapability()');
+      expect(md, `${name} must prefer an existing typed seam`).toMatch(/existing (typed )?(registry|hook)|typed seam/i);
+    }
+  });
+});
+
 describe.each(SKILLS)('%s', (name) => {
   const dir = join(SKILLS_DIR, name);
   const md = readFileSync(join(dir, 'SKILL.md'), 'utf8');

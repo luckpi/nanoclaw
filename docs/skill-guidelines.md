@@ -6,9 +6,15 @@ The authoritative checklist for writing a NanoClaw skill: the bar that conforman
 
 ## Principles
 
-Every customization is an additive **skill**: not an edit buried in core, but a skill that carries its own code and knows how to install and remove itself. Two principles make a skill *maintainable*; everything else in this document follows from them.
+Every customization is an additive **skill**: not an edit buried in core, but a skill that carries its own code and knows how to install and remove itself. Three principles make a skill *maintainable*; everything else in this document follows from them.
 
-### 1. Minimal integration surface
+### 1. One responsibility
+
+A skill owns one operator-selectable outcome and has one cohesive reason to change. Split work when parts can be selected, removed, versioned, tested, or evolved independently. Do not split cohesive behavior just to reduce an edit count: edit count is evidence about coupling, not the definition of responsibility.
+
+Before authoring, state the outcome, list the files the skill owns, identify prerequisite skills, and count every reach-in to an existing file. Keep implementation, tests, migration declarations, configuration adapters, and external-edge fakes in skill-owned files.
+
+### 2. Minimal integration surface
 
 A skill adds files and makes the **smallest possible reach-ins** into existing code. Adding a file or a dependency never breaks on upgrade; reaching into existing code is the only thing that does, so the integration surface *is* the upgrade risk. Keep reach-ins few, tiny, and ideally a single line that *calls* into the skill's own code.
 
@@ -19,7 +25,9 @@ Follows from this:
 - **Colocated, self-contained** edits over edits in two places.
 - **Use an existing registry or hook when there is one**: appending to a registry is a smaller surface than reaching into code. When none exists, a true code-level edit is fine and first-class. (Whether to *add* a hook because a spot has become a hotspot is the maintainer's call, not the skill's.)
 
-### 2. A test for every functional integration point
+For trusted Node.js/TypeScript code, the default is an in-process, self-registering module whose import performs registration only. Do not invent `registerCapability()`, capability metadata/discovery, filesystem auto-discovery, a child process, worker thread, IPC, or JSON-RPC as an authoring shortcut. Add a process or protocol only for a concrete isolation or interoperability requirement, and land any reusable host seam separately from the consuming skill.
+
+### 3. A test for every functional integration point
 
 Every reach-in with a **functional consequence** gets a test that goes **red if the wiring is deleted or drifts**. That's what protects the fork from upstream changes. The tests are also the verification: there is no separate "verify" step.
 
@@ -91,6 +99,7 @@ The integration point is wherever the skill reaches into existing code. Make it 
   A static import + call is acceptable too; this is a recommendation, not a mandate.
 - Keep any gating (feature flags, env checks) *inside* the skill's function, so the core edit stays a single call.
 - When the reach-in lands inside an entangled function, extract a tiny skill-owned helper so the core touch is one line, like `args.push(...mySkillEnvArgs())`, rather than exporting the whole function or inlining the logic.
+- For a cohesive code capability, aim for zero existing-file edits or one explicit barrel/registry registration. If more than one functional edit remains, add an `## Integration surface` section that explains why each point is unavoidable and guard each point with a deletion-sensitive test.
 
 ---
 
