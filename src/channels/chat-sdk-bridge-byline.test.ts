@@ -21,9 +21,21 @@ vi.mock('../webhook-server.js', () => ({
   }),
 }));
 
+vi.mock('../log.js', () => ({
+  log: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  },
+}));
+
 import { closeDb, initTestDb, runMigrations } from '../db/index.js';
+import { log } from '../log.js';
 import type { ChannelSetup } from './adapter.js';
 import { createChatSdkBridge } from './chat-sdk-bridge.js';
+import { registerQuestionRenderResolver } from './question-render-registry.js';
 
 interface CapturedEdit {
   threadId: string;
@@ -31,21 +43,27 @@ interface CapturedEdit {
   markdown: string;
 }
 
-function makeAdapter(edits: CapturedEdit[]): Adapter {
+function makeAdapter(edits: CapturedEdit[], editFailure?: Error): Adapter {
   return {
     name: 'stub',
     initialize: async () => {},
     channelIdFromThreadId: (threadId: string) => `stub:${threadId}`,
     editMessage: async (threadId: string, messageId: string, content: { markdown: string }) => {
+      if (editFailure) throw editFailure;
       edits.push({ threadId, messageId, markdown: content.markdown });
     },
   } as unknown as Adapter;
 }
 
-async function fireAction(user: Record<string, unknown>): Promise<{ edits: CapturedEdit[]; actions: string[] }> {
+async function fireAction(
+  user: Record<string, unknown>,
+  actionId = 'ncq:q-1:approve',
+  value = 'approve',
+  editFailure?: Error,
+): Promise<{ edits: CapturedEdit[]; actions: string[] }> {
   const edits: CapturedEdit[] = [];
   const actions: string[] = [];
-  const adapter = makeAdapter(edits);
+  const adapter = makeAdapter(edits, editFailure);
   const bridge = createChatSdkBridge({ adapter, supportsThreads: false });
 
   await bridge.setup({
@@ -61,13 +79,13 @@ async function fireAction(user: Record<string, unknown>): Promise<{ edits: Captu
   expect(chat).toBeTruthy();
   await chat.processAction(
     {
-      actionId: 'ncq:q-1:approve',
+      actionId,
       adapter,
       messageId: 'msg-1',
       raw: {},
       threadId: 'T-1',
       user: user as never,
-      value: 'approve',
+      value,
     },
     undefined,
   );
@@ -76,6 +94,7 @@ async function fireAction(user: Record<string, unknown>): Promise<{ edits: Captu
 
 beforeEach(() => {
   captured.chat = null;
+  vi.clearAllMocks();
   const db = initTestDb();
   runMigrations(db);
 });
@@ -108,5 +127,47 @@ describe('chat-sdk-bridge approval-card byline', () => {
     expect(edits).toHaveLength(1);
     expect(edits[0].markdown).not.toContain('—');
     expect(edits[0].markdown).toContain('approve');
+  });
+
+  it('resolves compact option indexes through a module resolver', async () => {
+    registerQuestionRenderResolver((questionId) => {
+      if (questionId !== 'module-compact-question') return undefined;
+      return {
+        title: 'Gateway approval',
+        options: [{ label: 'Approve', selectedLabel: 'Approved safely', value: 'approve-real-value' }],
+      };
+    });
+
+    const { edits, actions } = await fireAction(
+      { userId: 'U4', userName: 'reviewer' },
+      'ncq:module-compact-question:0',
+      '0',
+    );
+
+    expect(edits[0].markdown).toContain('Gateway approval');
+    expect(edits[0].markdown).toContain('Approved safely — reviewer');
+    expect(actions).toEqual(['module-compact-question:approve-real-value:U4']);
+  });
+
+  it('logs only a stable code when an interactive card edit fails', async () => {
+    await fireAction(
+      { userId: 'user-private-sentinel', userName: 'name-private-sentinel' },
+      'ncq:question-private-sentinel:option-private-sentinel',
+      'value-private-sentinel',
+      new Error('adapter-error-private-sentinel'),
+    );
+
+    expect(log.warn).toHaveBeenCalledWith('Question card edit failed', { code: 'QUESTION_CARD_EDIT_FAILED' });
+    const serializedLogs = JSON.stringify(vi.mocked(log.warn).mock.calls);
+    for (const sentinel of [
+      'user-private-sentinel',
+      'name-private-sentinel',
+      'question-private-sentinel',
+      'option-private-sentinel',
+      'value-private-sentinel',
+      'adapter-error-private-sentinel',
+    ]) {
+      expect(serializedLogs).not.toContain(sentinel);
+    }
   });
 });
