@@ -23,21 +23,9 @@ import { enforceUpgradeTripwire } from './upgrade-state.js';
 // circular import cycle: src/index.ts imports src/modules/index.js for side
 // effects, and the modules call registerResponseHandler at top level — which
 // would hit a TDZ error if the array lived here.
-import { getResponseHandlers, type ResponsePayload } from './response-registry.js';
+import { dispatchResponse } from './response-registry.js';
 
 const hostAbortController = new AbortController();
-
-async function dispatchResponse(payload: ResponsePayload): Promise<void> {
-  for (const handler of getResponseHandlers()) {
-    try {
-      const claimed = await handler(payload);
-      if (claimed) return;
-    } catch (err) {
-      log.error('Response handler threw', { questionId: payload.questionId, err });
-    }
-  }
-  log.warn('Unclaimed response', { questionId: payload.questionId, value: payload.value });
-}
 
 // Channel barrel — each enabled channel self-registers on import.
 // Channel skills uncomment lines in channels/index.ts to enable them.
@@ -125,7 +113,7 @@ async function main(): Promise<void> {
         });
       },
       onAction(questionId, selectedOption, userId) {
-        dispatchResponse({
+        void dispatchResponse({
           questionId,
           value: selectedOption,
           userId,
@@ -135,8 +123,6 @@ async function main(): Promise<void> {
           // pending_question / pending_approval row.
           platformId: '',
           threadId: null,
-        }).catch((err) => {
-          log.error('Failed to handle question response', { questionId, err });
         });
       },
     };
