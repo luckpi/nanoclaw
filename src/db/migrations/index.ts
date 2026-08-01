@@ -56,6 +56,26 @@ export const migrations: Migration[] = [
   migration020,
 ];
 
+/**
+ * Migrations contributed by self-registering modules.
+ *
+ * Built-in migrations always run first. Module migrations follow the import
+ * order of their owning modules, which is deterministic because the modules
+ * barrel uses explicit side-effect imports.
+ */
+const moduleMigrations: Migration[] = [];
+
+export function registerMigration(migration: Migration): void {
+  if ([...migrations, ...moduleMigrations].some((candidate) => candidate.name === migration.name)) {
+    throw new Error(`Migration "${migration.name}" already registered`);
+  }
+  moduleMigrations.push(migration);
+}
+
+export function getRegisteredMigrations(): readonly Migration[] {
+  return [...migrations, ...moduleMigrations];
+}
+
 /** Row shape of PRAGMA foreign_key_check. Child rowids are stable across a
  *  parent-table recreate (child tables aren't touched), so this JSON identity
  *  is a reliable before/after diff key. */
@@ -69,7 +89,7 @@ interface FkViolation {
 const fkIdentity = (v: FkViolation): string =>
   JSON.stringify({ table: v.table, rowid: v.rowid, parent: v.parent, fkid: v.fkid });
 
-export function runMigrations(db: Database.Database, list: Migration[] = migrations): void {
+export function runMigrations(db: Database.Database, list: readonly Migration[] = getRegisteredMigrations()): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,
