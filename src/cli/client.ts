@@ -5,7 +5,7 @@
  * formats the response, exits non-zero on error.
  *
  * Usage:
- *   ncl <resource> <verb> [target] [--key value ...] [--json]
+ *   ncl <resource> <verb> [target] [--key value ...] [--stdin-json] [--json]
  *
  * Examples:
  *   ncl groups list
@@ -16,10 +16,12 @@
  *   ncl groups help
  */
 import { randomUUID } from 'crypto';
+import { pathToFileURL } from 'url';
 
 import { formatResponse } from './format.js';
 import type { RequestFrame } from './frame.js';
 import { SocketTransport } from './socket-client.js';
+import { readStdinJsonArgs } from './stdin-json.js';
 import type { Transport } from './transport.js';
 import { formatTransportError } from './transport-errors.js';
 
@@ -32,7 +34,8 @@ async function main(): Promise<void> {
   }
 
   const { command, args, json } = parseArgv(argv);
-  const req: RequestFrame = { id: randomUUID(), command, args };
+  const requestArgs = argv.includes('--stdin-json') ? await readStdinJsonArgs(process.stdin, args) : args;
+  const req: RequestFrame = { id: randomUUID(), command, args: requestArgs };
   const transport: Transport = pickTransport();
 
   let res;
@@ -57,19 +60,25 @@ function pickTransport(): Transport {
   return new SocketTransport();
 }
 
-function parseArgv(argv: string[]): {
+export function parseArgv(argv: string[]): {
   command: string;
   args: Record<string, unknown>;
   json: boolean;
+  stdinJson: boolean;
 } {
   const positional: string[] = [];
   const args: Record<string, unknown> = {};
   let json = false;
+  let stdinJson = false;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') {
       json = true;
+      continue;
+    }
+    if (a === '--stdin-json') {
+      stdinJson = true;
       continue;
     }
     if (a.startsWith('--')) {
@@ -98,13 +107,13 @@ function parseArgv(argv: string[]): {
   // → command "groups-get", id "abc").
   const command = positional.join('-');
 
-  return { command, args, json };
+  return { command, args, json, stdinJson };
 }
 
 function printUsage(): void {
   process.stdout.write(
     [
-      'Usage: ncl <resource> <verb> [target] [--key value ...] [--json]',
+      'Usage: ncl <resource> <verb> [target] [--key value ...] [--stdin-json] [--json]',
       '',
       'Run `ncl help` to list available resources and commands.',
       '',
@@ -112,7 +121,9 @@ function printUsage(): void {
   );
 }
 
-main().catch((err) => {
-  process.stderr.write(`ncl: unexpected error: ${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(2);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    process.stderr.write(`ncl: unexpected error: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(2);
+  });
+}
