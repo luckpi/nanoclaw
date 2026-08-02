@@ -23,7 +23,23 @@ export interface ResponsePayload {
   threadId: string | null;
 }
 
-export type ResponseHandler = (payload: ResponsePayload) => Promise<boolean>;
+/**
+ * A handler normally returns true to claim the response and let the channel
+ * render the selected option. Security-sensitive handlers can claim a click
+ * without changing the card (for example, a wrong-user or replayed click).
+ */
+export interface ClaimedResponse {
+  claimed: true;
+  updateCard: boolean;
+}
+
+export type ResponseHandlerResult = boolean | ClaimedResponse;
+export type ResponseHandler = (payload: ResponsePayload) => Promise<ResponseHandlerResult>;
+
+export const RESPONSE_CLAIMED_NO_CARD_UPDATE: ClaimedResponse = Object.freeze({
+  claimed: true,
+  updateCard: false,
+});
 
 const responseHandlers: ResponseHandler[] = [];
 
@@ -42,14 +58,17 @@ export function getResponseHandlers(): readonly ResponseHandler[] {
  * response. The project-standard error object is logged, but the response
  * payload itself is never included in the log entry.
  *
- * Returns true when the first handler claims the response and false when no
- * handler claims it.
+ * Returns true only when the channel should render its generic selected-option
+ * card. False means either no handler claimed the response or a handler claimed
+ * it while deliberately suppressing that generic card update.
  */
 export async function dispatchResponse(payload: ResponsePayload): Promise<boolean> {
   for (const handler of [...responseHandlers]) {
     /* eslint-disable no-catch-all/no-catch-all -- one optional handler must not block later response owners */
     try {
-      if (await handler(payload)) return true;
+      const result = await handler(payload);
+      if (typeof result === 'object' && result.claimed) return result.updateCard;
+      if (result) return true;
     } catch (err) {
       log.error('Response handler failed', { err });
     }

@@ -6,8 +6,8 @@
  * a real Chat instance, which the test captures from the webhook-server
  * registration (mocked so no HTTP server binds a port). After a button click
  * the bridge edits the card; the edit must append " — <actor>" so shared
- * channels see who resolved an approval. Goes red if the byLine concatenation
- * is removed from the edited markdown.
+ * channels see who resolved an approval. The replacement card must not retain
+ * the original action buttons.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,7 +40,7 @@ import { registerQuestionRenderResolver } from './question-render-registry.js';
 interface CapturedEdit {
   threadId: string;
   messageId: string;
-  markdown: string;
+  message: { card?: unknown; fallbackText?: string };
 }
 
 function makeAdapter(edits: CapturedEdit[], editFailure?: Error): Adapter {
@@ -48,9 +48,9 @@ function makeAdapter(edits: CapturedEdit[], editFailure?: Error): Adapter {
     name: 'stub',
     initialize: async () => {},
     channelIdFromThreadId: (threadId: string) => `stub:${threadId}`,
-    editMessage: async (threadId: string, messageId: string, content: { markdown: string }) => {
+    editMessage: async (threadId: string, messageId: string, content: { card?: unknown; fallbackText?: string }) => {
       if (editFailure) throw editFailure;
-      edits.push({ threadId, messageId, markdown: content.markdown });
+      edits.push({ threadId, messageId, message: content });
     },
   } as unknown as Adapter;
 }
@@ -60,6 +60,7 @@ async function fireAction(
   actionId = 'ncq:q-1:approve',
   value = 'approve',
   editFailure?: Error,
+  updateCard?: boolean,
 ): Promise<{ edits: CapturedEdit[]; actions: string[] }> {
   const edits: CapturedEdit[] = [];
   const actions: string[] = [];
@@ -72,6 +73,7 @@ async function fireAction(
     onMetadata: () => {},
     onAction: (questionId: string, selectedOption: string, userId: string) => {
       actions.push(`${questionId}:${selectedOption}:${userId}`);
+      return updateCard;
     },
   } as ChannelSetup);
 
@@ -104,13 +106,17 @@ afterEach(() => {
 });
 
 describe('chat-sdk-bridge approval-card byline', () => {
-  it('appends the acting user to the edited card markdown', async () => {
+  it('appends the acting user and removes actions from the resolved card', async () => {
     const { edits, actions } = await fireAction({ userId: 'U1', userName: 'gavriel', fullName: 'Gavriel C' });
 
     expect(edits).toHaveLength(1);
     expect(edits[0].threadId).toBe('T-1');
     expect(edits[0].messageId).toBe('msg-1');
-    expect(edits[0].markdown).toContain('approve — gavriel');
+    expect(edits[0].message.fallbackText).toContain('approve — gavriel');
+    const card = JSON.stringify(edits[0].message.card);
+    expect(card).toContain('approve — gavriel');
+    expect(card).not.toContain('"type":"actions"');
+    expect(card).not.toContain('ncq:');
     expect(actions).toEqual(['q-1:approve:U1']);
   });
 
@@ -118,15 +124,15 @@ describe('chat-sdk-bridge approval-card byline', () => {
     const { edits } = await fireAction({ userId: 'U2', fullName: 'Gavriel C' });
 
     expect(edits).toHaveLength(1);
-    expect(edits[0].markdown).toContain('— Gavriel C');
+    expect(edits[0].message.fallbackText).toContain('— Gavriel C');
   });
 
   it('omits the byline when the actor has no name', async () => {
     const { edits } = await fireAction({ userId: 'U3' });
 
     expect(edits).toHaveLength(1);
-    expect(edits[0].markdown).not.toContain('—');
-    expect(edits[0].markdown).toContain('approve');
+    expect(edits[0].message.fallbackText).not.toContain('—');
+    expect(edits[0].message.fallbackText).toContain('approve');
   });
 
   it('resolves compact option indexes through a module resolver', async () => {
@@ -144,9 +150,22 @@ describe('chat-sdk-bridge approval-card byline', () => {
       '0',
     );
 
-    expect(edits[0].markdown).toContain('Gateway approval');
-    expect(edits[0].markdown).toContain('Approved safely — reviewer');
+    expect(edits[0].message.fallbackText).toContain('Gateway approval');
+    expect(edits[0].message.fallbackText).toContain('Approved safely — reviewer');
     expect(actions).toEqual(['module-compact-question:approve-real-value:U4']);
+  });
+
+  it('does not edit a card when the response owner suppresses the generic update', async () => {
+    const { edits, actions } = await fireAction(
+      { userId: 'U5', userName: 'bystander' },
+      'ncq:q-protected:approve',
+      'approve',
+      undefined,
+      false,
+    );
+
+    expect(actions).toEqual(['q-protected:approve:U5']);
+    expect(edits).toHaveLength(0);
   });
 
   it('logs only a stable code when an interactive card edit fails', async () => {

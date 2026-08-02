@@ -29,7 +29,12 @@ import {
   type AccessGateResult,
 } from '../../router.js';
 import type { InboundEvent } from '../../channels/adapter.js';
-import { registerResponseHandler, type ResponsePayload } from '../../response-registry.js';
+import {
+  registerResponseHandler,
+  RESPONSE_CLAIMED_NO_CARD_UPDATE,
+  type ResponseHandlerResult,
+  type ResponsePayload,
+} from '../../response-registry.js';
 import { getDeliveryAdapter } from '../../delivery.js';
 import { log } from '../../log.js';
 import type { MessagingGroup, MessagingGroupAgent } from '../../types.js';
@@ -232,7 +237,7 @@ setSenderScopeGate(
  * Deny: delete the row (no "deny list" — a future message re-triggers a
  * fresh card per ACTION-ITEMS item 5 "no denial persistence").
  */
-async function handleSenderApprovalResponse(payload: ResponsePayload): Promise<boolean> {
+async function handleSenderApprovalResponse(payload: ResponsePayload): Promise<ResponseHandlerResult> {
   const row = getPendingSenderApproval(payload.questionId);
   if (!row) return false;
 
@@ -253,7 +258,7 @@ async function handleSenderApprovalResponse(payload: ResponsePayload): Promise<b
       clickerId,
       expectedApprover: row.approver_user_id,
     });
-    return true; // claim the response so it's not unclaimed-logged, but do nothing
+    return RESPONSE_CLAIMED_NO_CARD_UPDATE;
   }
   const approverId = clickerId;
   const approved = payload.value === 'approve';
@@ -415,7 +420,7 @@ async function wireApprovedChannel(
  *                     captures the reply and creates immediately)
  *   reject          — set denied_at, delete pending row
  */
-async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<boolean> {
+async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<ResponseHandlerResult> {
   const row = getPendingChannelApproval(payload.questionId);
   if (!row) return false;
 
@@ -437,7 +442,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       expectedApprover: row.approver_user_id,
       reason: decision.reason,
     });
-    return true;
+    return RESPONSE_CLAIMED_NO_CARD_UPDATE;
   }
   const approverId = clickerId;
 
@@ -557,14 +562,14 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
         targetAgentGroupId,
         approverId,
       });
-      return true;
+      return RESPONSE_CLAIMED_NO_CARD_UPDATE;
     }
   } else {
     log.warn('Channel registration: unknown response value', {
       messagingGroupId: row.messaging_group_id,
       value: payload.value,
     });
-    return true;
+    return RESPONSE_CLAIMED_NO_CARD_UPDATE;
   }
 
   // ── Wire + replay (shared path for connect and create) ──

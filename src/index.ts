@@ -113,7 +113,7 @@ async function main(): Promise<void> {
         });
       },
       onAction(questionId, selectedOption, userId) {
-        void dispatchResponse({
+        return dispatchResponse({
           questionId,
           value: selectedOption,
           userId,

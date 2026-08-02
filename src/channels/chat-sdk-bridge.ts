@@ -326,19 +326,26 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
         const matched = render?.options.find((o) => o.value === selectedOption);
         const selectedLabel = matched?.selectedLabel ?? selectedOption ?? '(clicked)';
 
-        // Update the card to show the selected answer, who acted, and remove buttons
+        // Let the response owner authorize and claim the click before changing
+        // the card. A wrong-user or replayed approval must remain visually
+        // pending/terminal instead of displaying an action that never applied.
+        const shouldUpdateCard = await setupConfig.onAction(questionId, selectedOption, userId);
+        if (shouldUpdateCard === false) return;
+
+        // Replace the interactive card with a resolved card. A plain markdown
+        // edit leaves existing Slack blocks in place, including their buttons.
         const actorName = event.user?.userName || event.user?.fullName || '';
         const byLine = actorName ? ` — ${actorName}` : '';
+        const resolvedText = `${selectedLabel}${byLine}`;
         try {
           const tid = event.threadId;
           await adapter.editMessage(tid, event.messageId, {
-            markdown: `${title}\n\n${selectedLabel}${byLine}`,
+            card: Card({ title, children: [CardText(resolvedText)] }),
+            fallbackText: `${title}\n\n${resolvedText}`,
           });
         } catch {
           logQuestionCardEditFailure('warn');
         }
-
-        setupConfig.onAction(questionId, selectedOption, userId);
       });
 
       await chat.initialize();
@@ -675,7 +682,8 @@ async function handleForwardedEvent(
         }
       }
 
-      // Update the card to show the selected answer and remove buttons
+      // Resolve the click before updating the card. Discord still needs an
+      // acknowledgement when the owner suppresses the generic edit.
       const originalEmbeds =
         ((interaction.message as Record<string, unknown>)?.embeds as Array<Record<string, unknown>>) || [];
       const originalDescription = (originalEmbeds[0]?.description as string) || '';
@@ -686,30 +694,31 @@ async function handleForwardedEvent(
       const cardTitle = render?.title ?? ((originalEmbeds[0]?.title as string) || '❓ Question');
       const matchedOpt = render?.options.find((o) => o.value === selectedOption);
       const selectedLabel = matchedOpt?.selectedLabel ?? selectedOption ?? customId;
+      const shouldUpdateCard =
+        questionId && selectedOption ? await setupConfig.onAction(questionId, selectedOption, user?.id || '') : false;
       try {
         await fetch(`https://discord.com/api/v10/interactions/${interactionId}/${interactionToken}/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 7, // UPDATE_MESSAGE — acknowledge + update in one call
-            data: {
-              embeds: [
-                {
-                  title: cardTitle,
-                  description: `${originalDescription}\n\n${selectedLabel}`,
+          body: JSON.stringify(
+            shouldUpdateCard === false
+              ? { type: 6 }
+              : {
+                  type: 7, // UPDATE_MESSAGE — acknowledge + update in one call
+                  data: {
+                    embeds: [
+                      {
+                        title: cardTitle,
+                        description: `${originalDescription}\n\n${selectedLabel}`,
+                      },
+                    ],
+                    components: [], // remove buttons
+                  },
                 },
-              ],
-              components: [], // remove buttons
-            },
-          }),
+          ),
         });
       } catch {
         logQuestionCardEditFailure('error');
-      }
-
-      // Dispatch to host
-      if (questionId && selectedOption) {
-        setupConfig.onAction(questionId, selectedOption, user?.id || '');
       }
       return;
     }

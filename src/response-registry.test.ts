@@ -64,6 +64,18 @@ describe('response dispatch registry', () => {
     expect(later).not.toHaveBeenCalled();
   });
 
+  it('stops at a claimed response that suppresses the generic card update', async () => {
+    const registry = await import('./response-registry.js');
+    const { log } = await import('./log.js');
+    const later = vi.fn(async () => true);
+    registry.registerResponseHandler(async () => registry.RESPONSE_CLAIMED_NO_CARD_UPDATE);
+    registry.registerResponseHandler(later);
+
+    await expect(registry.dispatchResponse(sentinelPayload())).resolves.toBe(false);
+    expect(later).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalledWith('Response was not claimed', expect.anything());
+  });
+
   it('returns false and emits only a stable code when no handler claims the response', async () => {
     const registry = await import('./response-registry.js');
     const { log } = await import('./log.js');

@@ -17,7 +17,11 @@
  */
 import { wakeContainer } from '../../container-runner.js';
 import { deletePendingApproval, getPendingApproval, getSession } from '../../db/sessions.js';
-import type { ResponsePayload } from '../../response-registry.js';
+import {
+  RESPONSE_CLAIMED_NO_CARD_UPDATE,
+  type ResponseHandlerResult,
+  type ResponsePayload,
+} from '../../response-registry.js';
 import { log } from '../../log.js';
 import { writeSessionMessage } from '../../session-manager.js';
 import type { PendingApproval } from '../../types.js';
@@ -27,7 +31,7 @@ import { ONECLI_ACTION, resolveOneCLIApproval } from './onecli-approvals.js';
 import { getApprovalHandler, notifyApprovalResolved, REJECT_WITH_REASON_VALUE } from './primitive.js';
 import { armReasonCapture } from './reason-capture.js';
 
-export async function handleApprovalsResponse(payload: ResponsePayload): Promise<boolean> {
+export async function handleApprovalsResponse(payload: ResponsePayload): Promise<ResponseHandlerResult> {
   const approval = getPendingApproval(payload.questionId);
   if (!approval) return false;
 
@@ -38,7 +42,7 @@ export async function handleApprovalsResponse(payload: ResponsePayload): Promise
       userId: payload.userId,
       channelType: payload.channelType,
     });
-    return true;
+    return RESPONSE_CLAIMED_NO_CARD_UPDATE;
   }
 
   if (approval.action === ONECLI_ACTION) {

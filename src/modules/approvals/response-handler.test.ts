@@ -81,7 +81,7 @@ describe('approval response authorization', () => {
       threadId: null,
     });
 
-    expect(claimed).toBe(true);
+    expect(claimed).toMatchObject({ claimed: true, updateCard: false });
     expect(handler).not.toHaveBeenCalled();
     expect(getPendingApproval('appr-1')).toBeDefined();
   });
