@@ -66,6 +66,8 @@ export interface ProviderOptions {
   mcpServers?: Record<string, McpServerConfig>;
   env?: Record<string, string | undefined>;
   additionalDirectories?: string[];
+  /** ACP provider 的额外配置（仅当 provider 为 acp 时使用）。 */
+  acp?: AcpConfig;
   /**
    * Model alias (`sonnet`, `opus`, `haiku`) or full model ID. Passed through
    * to the underlying SDK. If omitted, the SDK default is used.
@@ -104,6 +106,22 @@ export interface McpServerConfig {
   command: string;
   args: string[];
   env: Record<string, string>;
+}
+
+/** ACP provider 的额外运行时配置（也可以写在 groups/<folder>/acp.json 里）。 */
+export interface AcpConfig {
+  /** 手动指定的 ACP agent 启动命令。 */
+  command?: string;
+  /** 启动参数。 */
+  args?: string[];
+  /** ACP session 的 cwd（默认为 /workspace/agent）。 */
+  cwd?: string;
+  /** 额外的工作区根目录。 */
+  additionalDirectories?: string[];
+  /** 传给 ACP agent 子进程的额外环境变量。 */
+  env?: Record<string, string>;
+  /** 工具权限处理模式。 */
+  permissionMode?: 'auto-approve' | 'auto-deny' | 'prompt';
 }
 
 export interface AgentQuery {

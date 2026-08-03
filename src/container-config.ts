@@ -24,6 +24,16 @@ export interface McpServerConfig {
   instructions?: string;
 }
 
+/** ACP provider 的额外运行时配置。 */
+export interface AcpConfig {
+  command?: string;
+  args?: string[];
+  cwd?: string;
+  additionalDirectories?: string[];
+  env?: Record<string, string>;
+  permissionMode?: 'auto-approve' | 'auto-deny' | 'prompt';
+}
+
 export interface AdditionalMountConfig {
   hostPath: string;
   containerPath: string;
@@ -45,6 +55,7 @@ export interface ContainerConfig {
   model?: string;
   effort?: string;
   timezone?: string;
+  acp?: AcpConfig;
 }
 
 /**
@@ -56,6 +67,16 @@ export interface ContainerConfig {
 export function resolveGroupTimezone(agentGroupId: string): string {
   const tz = getContainerConfig(agentGroupId)?.timezone;
   return tz && isValidTimezone(tz) ? tz : TIMEZONE;
+}
+
+/** 读取 groups/<folder>/acp.json（如果存在）。 */
+function readAcpConfig(group: AgentGroup): AcpConfig | undefined {
+  const p = path.join(GROUPS_DIR, group.folder, 'acp.json');
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8')) as AcpConfig;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Build a `ContainerConfig` from a DB row + agent group identity. */
@@ -77,6 +98,7 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     model: row.model ?? undefined,
     effort: row.effort ?? undefined,
     timezone: row.timezone && isValidTimezone(row.timezone) ? row.timezone : undefined,
+    acp: readAcpConfig(group),
   };
 }
 

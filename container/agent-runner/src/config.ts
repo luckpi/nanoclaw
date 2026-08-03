@@ -7,6 +7,8 @@
  */
 import fs from 'fs';
 
+import type { AcpConfig } from './providers/types.js';
+
 const CONFIG_PATH = '/workspace/agent/container.json';
 
 export interface RunnerConfig {
@@ -18,6 +20,7 @@ export interface RunnerConfig {
   mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>;
   model?: string;
   effort?: string;
+  acp?: AcpConfig;
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
@@ -47,6 +50,7 @@ export function loadConfig(): RunnerConfig {
     mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
     model: (raw.model as string) || undefined,
     effort: (raw.effort as string) || undefined,
+    acp: (raw.acp as AcpConfig) || undefined,
   };
 
   return _config;
